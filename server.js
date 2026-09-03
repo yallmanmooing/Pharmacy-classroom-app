@@ -4,13 +4,7 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 
 app.use(express.static('public'));
-const path = require('path');
 
-// Explicit route to serve index.html on home page visit
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-const rooms = {};
 
 io.on('connection', (socket) => {
     socket.on('join-room', ({ roomId, username, isHost }) => {
