@@ -3,271 +3,382 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pharmacy Classroom & Meeting App</title>
+    <title>Pharmacy Classroom & Workspace</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; height: 100vh; background: #1a1a2e; color: #fff; overflow: hidden; }
-        
-        #lobby { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 15px; }
-        #lobby input, #lobby select { padding: 12px; font-size: 16px; border-radius: 6px; border: none; width: 260px; text-align: center; }
-        .btn { padding: 12px 24px; font-size: 16px; border-radius: 6px; border: none; background: #007bff; color: white; cursor: pointer; font-weight: bold; width: 260px; }
-        .btn:hover { background: #0056b3; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #121212; color: #fff; height: 100vh; overflow: hidden; }
 
-        #app-container { display: none; height: 100vh; flex-direction: column; }
-        #top-bar { height: 50px; background: #16213e; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid #0f3460; }
-        #main-stage { display: flex; flex: 1; overflow: hidden; position: relative; }
+        /* Lobby */
+        #lobby { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 12px; background: #1e1e2e; }
+        #lobby h1 { font-size: 26px; margin-bottom: 10px; color: #00adb5; }
+        #lobby input, #lobby select { width: 280px; padding: 12px; border-radius: 6px; border: 1px solid #333; background: #2d2d44; color: white; font-size: 15px; outline: none; }
+        #lobby button { width: 280px; padding: 12px; border-radius: 6px; border: none; background: #00adb5; color: white; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
+        #lobby button:hover { background: #00888e; }
 
-        #sidebar { width: 280px; background: #0f3460; padding: 15px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
-        .section-title { font-size: 11px; font-weight: 700; color: #e94560; text-transform: uppercase; margin-bottom: 3px; }
-        .tool-group { display: flex; flex-wrap: wrap; gap: 6px; }
-        .tool-btn { background: #1a1a2e; border: 1px solid #16213e; color: #fff; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; flex: 1 1 calc(50% - 3px); text-align: center; }
-        .tool-btn.active { background: #e94560; border-color: #e94560; }
-        
-        #participant-list { list-style: none; margin-top: 5px; font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
-        #participant-list li { background: #1a1a2e; padding: 8px 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 4px; }
-        .user-header { display: flex; justify-content: space-between; align-items: center; }
-        .user-status { display: flex; gap: 8px; font-size: 11px; color: #8c939d; }
-        .status-on { color: #67c23a; }
-        .status-off { color: #f56c6c; }
+        /* Main Workspace Layout */
+        #app { display: none; height: 100vh; flex-direction: column; }
+        #top-bar { height: 48px; background: #181824; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid #2a2a3d; font-size: 14px; }
+        #main-stage { flex: 1; display: flex; overflow: hidden; position: relative; }
 
-        .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
-        .badge-host { background: #e94560; color: white; }
-        .badge-student { background: #17a2b8; color: white; }
+        /* Sidebar Tools & Participants */
+        #sidebar { width: 260px; background: #1e1e2e; border-right: 1px solid #2a2a3d; display: flex; flex-direction: column; padding: 12px; gap: 12px; overflow-y: auto; }
+        .section-title { font-size: 11px; font-weight: bold; color: #00adb5; text-transform: uppercase; letter-spacing: 0.5px; }
+        .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .tool-btn { padding: 8px; background: #2d2d44; border: 1px solid #3d3d5c; color: white; border-radius: 4px; font-size: 12px; cursor: pointer; text-align: center; }
+        .tool-btn.active { background: #00adb5; border-color: #00adb5; }
+        .tool-btn.full { grid-column: span 2; }
 
-        #workspace { flex: 1; display: flex; flex-direction: column; position: relative; background: #ffffff; }
-        canvas { flex: 1; width: 100%; height: 100%; display: block; }
-        
-        #video-grid { display: flex; gap: 10px; padding: 10px; background: #16213e; max-height: 150px; overflow-x: auto; }
-        video { height: 120px; border-radius: 8px; background: #000; object-fit: cover; }
+        #participant-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+        #participant-list li { background: #2d2d44; padding: 8px; border-radius: 4px; font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
+        .user-meta { display: flex; justify-content: space-between; align-items: center; }
+        .role-tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: bold; }
+        .role-teacher { background: #e94560; color: white; }
+        .role-student { background: #17a2b8; color: white; }
+        .user-status { font-size: 10px; color: #aaa; display: flex; gap: 8px; }
 
-        /* Slide-out Chat Drawer */
-        #chat-drawer { position: absolute; right: 0; top: 0; bottom: 0; width: 320px; background: #16213e; border-left: 1px solid #0f3460; display: none; flex-direction: column; z-index: 10; }
-        #chat-header { height: 45px; background: #0f3460; padding: 0 15px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 14px; }
-        #chat-messages { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; user-select: text; }
-        .chat-msg { background: #1a1a2e; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
-        .chat-msg .meta { font-size: 10px; color: #8c939d; margin-bottom: 3px; display: flex; justify-content: space-between; }
-        #chat-input-area { padding: 10px; background: #0f3460; display: flex; gap: 6px; }
-        #chat-input { flex: 1; padding: 8px 12px; border-radius: 4px; border: none; font-size: 13px; outline: none; color: #000; }
-        #chat-send-btn { background: #007bff; border: none; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        #chat-disabled-banner { display: none; background: #dc3545; color: white; font-size: 12px; padding: 8px; text-align: center; }
+        /* Canvas Stage */
+        #canvas-container { flex: 1; position: relative; background: #ffffff; display: flex; align-items: center; justify-content: center; }
+        canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
 
-        #controls-bar { height: 60px; background: #16213e; display: flex; align-items: center; justify-content: center; gap: 15px; border-top: 1px solid #0f3460; }
-        .control-btn { padding: 10px 16px; border-radius: 20px; border: none; background: #0f3460; color: white; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-        .control-btn.active { background: #67c23a; }
-        .btn-leave { background: #dc3545; }
+        /* Video Streams Grid */
+        #video-grid { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 8px; z-index: 5; max-width: 60%; overflow-x: auto; }
+        video { width: 130px; height: 95px; background: #000; border-radius: 6px; object-fit: cover; border: 2px solid #2a2a3d; }
+
+        /* Chat Overlay Drawer */
+        #chat-drawer { position: absolute; right: 0; top: 0; bottom: 0; width: 300px; background: #181824; border-left: 1px solid #2a2a3d; display: none; flex-direction: column; z-index: 10; }
+        #chat-header { padding: 12px; background: #1e1e2e; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between; border-bottom: 1px solid #2a2a3d; }
+        #chat-messages { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+        .msg { background: #2d2d44; padding: 8px 10px; border-radius: 6px; }
+        .msg-sender { font-size: 11px; font-weight: bold; color: #00adb5; margin-bottom: 2px; }
+        #chat-input-area { padding: 10px; background: #1e1e2e; display: flex; gap: 6px; border-top: 1px solid #2a2a3d; }
+        #chat-input { flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #333; background: #2d2d44; color: white; font-size: 13px; outline: none; }
+        #chat-disabled-msg { display: none; padding: 10px; background: #d9534f; text-align: center; font-size: 12px; font-weight: bold; }
+
+        /* Bottom Controls Bar */
+        #controls-bar { height: 56px; background: #181824; display: flex; align-items: center; justify-content: center; gap: 12px; border-top: 1px solid #2a2a3d; }
+        .ctrl-btn { padding: 8px 16px; border-radius: 20px; border: none; background: #2d2d44; color: white; cursor: pointer; font-size: 13px; font-weight: bold; }
+        .ctrl-btn.active { background: #28a745; }
+        .ctrl-btn.danger { background: #dc3545; }
     </style>
 </head>
 <body>
 
 <div id="lobby">
-    <h2>Pharmacy Live Classroom</h2>
-    <input type="text" id="username" placeholder="Your Name">
-    <input type="text" id="room-code" placeholder="Enter Room Code">
+    <h1>Pharmacy Interactive Board</h1>
+    <input type="text" id="username" placeholder="Your Display Name">
+    <input type="text" id="room-code" placeholder="Room Code (e.g., PHARM101)">
     <select id="user-role">
         <option value="student">Student</option>
         <option value="host">Teacher (Host)</option>
     </select>
-    <button class="btn" onclick="joinRoom()">Enter Classroom</button>
+    <button onclick="joinRoom()">Join Classroom</button>
 </div>
 
-<div id="app-container">
+<div id="app">
     <div id="top-bar">
-        <span>Room Code: <strong id="display-room-code" style="color:#e94560;">---</strong></span>
-        <span>Participants: <strong id="participant-count" style="color:#67c23a;">0</strong></span>
+        <span>Room: <strong id="disp-room" style="color:#00adb5;">---</strong></span>
+        <span>Users Online: <strong id="disp-count" style="color:#28a745;">0</strong></span>
     </div>
 
     <div id="main-stage">
         <div id="sidebar">
-            <div id="host-controls">
-                <div class="section-title">Host Controls</div>
-                <div class="tool-group">
-                    <button id="tool-draw" class="tool-btn active" onclick="setTool('draw')">✏️ Draw</button>
+            <div id="teacher-controls">
+                <div class="section-title">Drawing Tools</div>
+                <div class="tool-grid">
+                    <button id="tool-draw" class="tool-btn active" onclick="setTool('draw')">✏️ Pen</button>
                     <button id="tool-erase" class="tool-btn" onclick="setTool('erase')">🧹 Eraser</button>
-                    <button id="tool-text" class="tool-btn" onclick="setTool('text')">🔤 Text Box</button>
-                    <button id="btn-toggle-chat" class="tool-btn" style="background:#ffc107; color:#000; flex:1 1 100%; margin-top:2px;" onclick="toggleChatPermission()">🔒 Disable Chat</button>
-                    <button class="tool-btn" style="background:#dc3545; flex:1 1 100%; margin-top:2px;" onclick="clearWhiteboard()">🗑️ Clear Whiteboard</button>
+                    <button id="tool-text" class="tool-btn" onclick="setTool('text')">🔤 Text</button>
+                    <button class="tool-btn" onclick="clearBoard()">🗑️ Clear</button>
                 </div>
 
                 <div class="section-title" style="margin-top:8px;">Properties</div>
-                <div class="tool-group">
-                    <input type="color" id="color-picker" value="#000000" style="width:100%; height:26px;" onchange="currentColor=this.value">
-                    <input type="range" id="brush-size" min="1" max="30" value="4" style="width:100%;" oninput="currentSize=this.value">
+                <div class="tool-grid">
+                    <input type="color" id="color-picker" value="#000000" style="width:100%; height:30px; cursor:pointer;" onchange="currentColor=this.value">
+                    <input type="range" id="brush-size" min="1" max="20" value="3" style="width:100%;" oninput="currentSize=this.value">
                 </div>
 
-                <div class="section-title" style="margin-top:8px;">Arrows & Bonds</div>
-                <div class="tool-group">
-                    <button id="tool-arrow" class="tool-btn" onclick="setTool('arrow')">➔ Reaction Arrow</button>
-                    <button id="tool-equilibrium" class="tool-btn" onclick="setTool('equilibrium')">⇌ Equilibrium</button>
+                <div class="section-title" style="margin-top:8px;">Chemical Shapes</div>
+                <div class="tool-grid">
+                    <button id="tool-benzene" class="tool-btn" onclick="setTool('benzene')">⬡ Benzene</button>
                     <button id="tool-singlebond" class="tool-btn" onclick="setTool('singlebond')">— Single Bond</button>
                     <button id="tool-doublebond" class="tool-btn" onclick="setTool('doublebond')">= Double Bond</button>
-                    <button id="tool-triplebond" class="tool-btn" onclick="setTool('triplebond')">≡ Triple Bond</button>
+                    <button id="tool-arrow" class="tool-btn" onclick="setTool('arrow')">➔ Arrow</button>
+                    <button id="tool-pill" class="tool-btn full" onclick="setTool('pill')">💊 Capsule / Pill</button>
                 </div>
 
-                <div class="section-title" style="margin-top:8px;">Chemistry Tools</div>
-                <div class="tool-group">
-                    <button id="tool-benzene" class="tool-btn" onclick="setTool('benzene')">⬡ Benzene</button>
-                    <button id="tool-beaker" class="tool-btn" onclick="setTool('beaker')">🧪 Beaker</button>
-                    <button id="tool-flask" class="tool-btn" onclick="setTool('flask')">🏺 Flask</button>
-                    <button id="tool-pill" class="tool-btn" onclick="setTool('pill')">💊 Capsule</button>
+                <div class="section-title" style="margin-top:8px;">Room Admin</div>
+                <div class="tool-grid">
+                    <button id="btn-toggle-chat" class="tool-btn full" style="background:#ffc107; color:#000; font-weight:bold;" onclick="toggleChatPermission()">🔒 Disable Chat</button>
                 </div>
             </div>
 
-            <div class="section-title" style="margin-top:10px;">Participants List</div>
+            <div class="section-title" style="margin-top:8px;">Participants</div>
             <ul id="participant-list"></ul>
         </div>
 
-        <div id="workspace">
-            <canvas id="whiteboard"></canvas>
+        <div id="canvas-container">
+            <canvas id="board"></canvas>
             <div id="video-grid">
                 <video id="local-video" autoplay muted playsinline></video>
             </div>
         </div>
 
-        <!-- Chat Overlay Side-Drawer -->
         <div id="chat-drawer">
             <div id="chat-header">
                 <span>💬 Classroom Chat</span>
                 <span style="cursor:pointer;" onclick="toggleChatDrawer()">✖</span>
             </div>
             <div id="chat-messages"></div>
-            <div id="chat-disabled-banner">Chat is disabled by the teacher</div>
+            <div id="chat-disabled-msg">Chat is restricted by teacher</div>
             <div id="chat-input-area">
-                <input type="text" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key === 'Enter') sendChatMessage()">
-                <button id="chat-send-btn" onclick="sendChatMessage()">Send</button>
+                <input type="text" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendChat()">
+                <button class="ctrl-btn" onclick="sendChat()">Send</button>
             </div>
         </div>
     </div>
 
     <div id="controls-bar">
-        <button class="control-btn" id="btn-audio" onclick="toggleAudio()">🎤 Muted</button>
-        <button class="control-btn" id="btn-video" onclick="toggleVideo()">📹 Camera Off</button>
-        <button class="control-btn" id="btn-chat" onclick="toggleChatDrawer()">💬 Chat</button>
-        <button class="control-btn btn-leave" onclick="leaveMeeting()">🚪 Leave</button>
+        <button class="ctrl-btn" id="btn-audio" onclick="toggleAudio()">🎤 Mic Off</button>
+        <button class="ctrl-btn" id="btn-video" onclick="toggleVideo()">📹 Cam Off</button>
+        <button class="ctrl-btn" id="btn-chat" onclick="toggleChatDrawer()">💬 Chat</button>
+        <button class="ctrl-btn danger" onclick="location.reload()">🚪 Leave</button>
     </div>
 </div>
 
 <script>
     const socket = io();
-    let myStream;
     let isHost = false;
+    let myStream = null;
     let currentTool = 'draw';
     let currentColor = '#000000';
-    let currentSize = 4;
+    let currentSize = 3;
     let isDrawing = false;
-    let roomId = '';
     let startX = 0, startY = 0;
-    let snapshot;
     let chatEnabled = true;
+    let peerConnections = {};
 
-    const canvas = document.getElementById('whiteboard');
+    const canvas = document.getElementById('board');
     const ctx = canvas.getContext('2d');
 
     window.addEventListener('resize', resizeCanvas);
 
+    function resizeCanvas() {
+        const container = document.getElementById('canvas-container');
+        if (!container) return;
+        
+        // Preserve drawing on resize
+        const tempImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.putImageData(tempImage, 0, 0);
+    }
+
     function joinRoom() {
-        roomId = document.getElementById('room-code').value.trim();
+        const roomId = document.getElementById('room-code').value.trim();
         const username = document.getElementById('username').value.trim() || 'User';
         const requestedHost = document.getElementById('user-role').value === 'host';
 
         if (!roomId) return alert("Please enter a room code!");
-        
+
         document.getElementById('lobby').style.display = 'none';
-        document.getElementById('app-container').style.display = 'flex';
-        document.getElementById('display-room-code').innerText = roomId;
+        document.getElementById('app').style.display = 'flex';
+        document.getElementById('disp-room').innerText = roomId;
 
-        setTimeout(() => {
-            resizeCanvas();
-        }, 100);
-
+        resizeCanvas();
         initMedia();
-        
+
         socket.emit('join-room', { roomId, username, isHost: requestedHost });
     }
 
     socket.on('role-confirmed', (data) => {
         isHost = data.isHost;
-        if (!isHost) {
-            document.getElementById('host-controls').style.display = 'none';
-            canvas.style.cursor = 'default';
-        } else {
-            document.getElementById('host-controls').style.display = 'block';
-            canvas.style.cursor = 'crosshair';
-        }
-        updateChatUIState();
+        document.getElementById('teacher-controls').style.display = isHost ? 'block' : 'none';
+        canvas.style.cursor = isHost ? 'crosshair' : 'default';
     });
-
-    socket.on('host-denied', (msg) => { alert(msg); });
 
     async function initMedia() {
         try {
             myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             document.getElementById('local-video').srcObject = myStream;
+            
+            // Start muted by default
             myStream.getAudioTracks()[0].enabled = false;
             myStream.getVideoTracks()[0].enabled = false;
-            broadcastMediaStatus();
         } catch (err) {
-            console.error("Audio/Video access error", err);
+            console.warn("Media devices unaccessible or blocked:", err);
         }
     }
 
     function toggleAudio() {
-        const audioTrack = myStream?.getAudioTracks()[0];
-        if (!audioTrack) return;
-        audioTrack.enabled = !audioTrack.enabled;
+        if (!myStream) return;
+        const track = myStream.getAudioTracks()[0];
+        if (!track) return;
+        track.enabled = !track.enabled;
         
         const btn = document.getElementById('btn-audio');
-        btn.innerText = audioTrack.enabled ? "🎤 Unmuted" : "🎤 Muted";
-        btn.classList.toggle('active', audioTrack.enabled);
-        broadcastMediaStatus();
+        btn.innerText = track.enabled ? "🎤 Mic On" : "🎤 Mic Off";
+        btn.classList.toggle('active', track.enabled);
+        
+        socket.emit('update-media-status', { isMuted: !track.enabled, isCameraOn: myStream.getVideoTracks()[0]?.enabled || false });
     }
 
     function toggleVideo() {
-        const videoTrack = myStream?.getVideoTracks()[0];
-        if (!videoTrack) return;
-        videoTrack.enabled = !videoTrack.enabled;
-        
+        if (!myStream) return;
+        const track = myStream.getVideoTracks()[0];
+        if (!track) return;
+        track.enabled = !track.enabled;
+
         const btn = document.getElementById('btn-video');
-        btn.innerText = videoTrack.enabled ? "📹 Camera On" : "📹 Camera Off";
-        btn.classList.toggle('active', videoTrack.enabled);
-        broadcastMediaStatus();
+        btn.innerText = track.enabled ? "📹 Cam On" : "📹 Cam Off";
+        btn.classList.toggle('active', track.enabled);
+
+        socket.emit('update-media-status', { isMuted: !myStream.getAudioTracks()[0]?.enabled || true, isCameraOn: track.enabled });
     }
 
-    function broadcastMediaStatus() {
-        const audioTrack = myStream?.getAudioTracks()[0];
-        const videoTrack = myStream?.getVideoTracks()[0];
-        socket.emit('update-media-status', {
-            isMuted: !audioTrack?.enabled,
-            isCameraOn: !!videoTrack?.enabled
-        });
+    /* Drawing Core Engine */
+    function setTool(tool) {
+        if (!isHost) return;
+        currentTool = tool;
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        const btn = document.getElementById(`tool-${tool}`);
+        if (btn) btn.classList.add('active');
     }
 
-    function leaveMeeting() { window.location.reload(); }
+    canvas.addEventListener('mousedown', (e) => {
+        if (!isHost) return;
+        const rect = canvas.getBoundingClientRect();
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
 
-    function resizeCanvas() {
-        if (!canvas.parentElement) return;
-        canvas.width = canvas.parentElement.clientWidth;
-        canvas.height = canvas.parentElement.clientHeight;
+        if (currentTool === 'text') {
+            const txt = prompt("Enter text/formula:", "");
+            if (txt) {
+                const stroke = { tool: 'text', text: txt, x: startX, y: startY, color: currentColor, size: currentSize * 4 + 12 };
+                renderStroke(stroke);
+                socket.emit('draw-stroke', stroke);
+            }
+            return;
+        }
+
+        isDrawing = true;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isHost || !isDrawing) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        if (currentTool === 'draw' || currentTool === 'erase') {
+            const stroke = {
+                tool: currentTool,
+                x1: startX, y1: startY,
+                x2: x, y2: y,
+                color: currentTool === 'erase' ? '#ffffff' : currentColor,
+                size: currentSize
+            };
+            renderStroke(stroke);
+            socket.emit('draw-stroke', stroke);
+            startX = x;
+            startY = y;
+        }
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+        if (!isHost || !isDrawing) return;
+        isDrawing = false;
+        const rect = canvas.getBoundingClientRect();
+        const endX = e.clientX - rect.left;
+        const endY = e.clientY - rect.top;
+
+        if (currentTool !== 'draw' && currentTool !== 'erase' && currentTool !== 'text') {
+            const stroke = { tool: currentTool, x1: startX, y1: startY, x2: endX, y2: endY, color: currentColor, size: currentSize };
+            renderStroke(stroke);
+            socket.emit('draw-stroke', stroke);
+        }
+    });
+
+    function renderStroke(data) {
+        ctx.lineWidth = data.size;
+        ctx.strokeStyle = data.color;
+        ctx.fillStyle = data.color;
+        ctx.lineCap = 'round';
+
+        if (data.tool === 'text') {
+            ctx.font = `${data.size}px sans-serif`;
+            ctx.fillText(data.text, data.x, data.y);
+            return;
+        }
+
+        ctx.beginPath();
+        if (data.tool === 'draw' || data.tool === 'erase') {
+            ctx.moveTo(data.x1, data.y1);
+            ctx.lineTo(data.x2, data.y2);
+            ctx.stroke();
+        } else if (data.tool === 'singlebond') {
+            ctx.moveTo(data.x1, data.y1); ctx.lineTo(data.x2, data.y2); ctx.stroke();
+        } else if (data.tool === 'doublebond') {
+            const dx = data.x2 - data.x1, dy = data.y2 - data.y1;
+            const angle = Math.atan2(dy, dx);
+            const px = Math.sin(angle) * 3, py = -Math.cos(angle) * 3;
+            ctx.moveTo(data.x1 + px, data.y1 + py); ctx.lineTo(data.x2 + px, data.y2 + py);
+            ctx.moveTo(data.x1 - px, data.y1 - py); ctx.lineTo(data.x2 - px, data.y2 - py); ctx.stroke();
+        } else if (data.tool === 'arrow') {
+            const dx = data.x2 - data.x1, dy = data.y2 - data.y1;
+            const angle = Math.atan2(dy, dx);
+            ctx.moveTo(data.x1, data.y1); ctx.lineTo(data.x2, data.y2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(data.x2, data.y2);
+            ctx.lineTo(data.x2 - 10 * Math.cos(angle - Math.PI / 6), data.y2 - 10 * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(data.x2 - 10 * Math.cos(angle + Math.PI / 6), data.y2 - 10 * Math.sin(angle + Math.PI / 6));
+            ctx.closePath(); ctx.fill();
+        } else if (data.tool === 'benzene') {
+            const radius = Math.hypot(data.x2 - data.x1, data.y2 - data.y1);
+            for (let i = 0; i < 6; i++) {
+                const a = (Math.PI / 3) * i;
+                const px = data.x1 + radius * Math.cos(a);
+                const py = data.y1 + radius * Math.sin(a);
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.closePath(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(data.x1, data.y1, radius * 0.55, 0, Math.PI * 2); ctx.stroke();
+        } else if (data.tool === 'pill') {
+            ctx.arc(data.x1 - 10, data.y1, 10, Math.PI / 2, -Math.PI / 2);
+            ctx.arc(data.x1 + 10, data.y1, 10, -Math.PI / 2, Math.PI / 2);
+            ctx.closePath(); ctx.stroke();
+        }
+    }
+
+    function clearBoard() {
+        if (!isHost) return;
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        socket.emit('clear-canvas');
     }
 
-    /* Chat Drawer & Permission Logic */
+    socket.on('draw-stroke', renderStroke);
+    socket.on('load-canvas-history', (history) => history.forEach(renderStroke));
+    socket.on('clear-canvas', () => {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    });
+
+    /* Chat System */
     function toggleChatDrawer() {
-        const chatDrawer = document.getElementById('chat-drawer');
-        const isOpen = chatDrawer.style.display === 'flex';
-        chatDrawer.style.display = isOpen ? 'none' : 'flex';
-        document.getElementById('btn-chat').classList.toggle('active', !isOpen);
+        const drawer = document.getElementById('chat-drawer');
+        const isVisible = drawer.style.display === 'flex';
+        drawer.style.display = isVisible ? 'none' : 'flex';
     }
 
-    function sendChatMessage() {
+    function sendChat() {
         const input = document.getElementById('chat-input');
-        const text = input.value.trim();
-        if (!text) return;
-
-        if (!chatEnabled && !isHost) return;
-
-        socket.emit('send-chat-message', text);
+        const txt = input.value.trim();
+        if (!txt) return;
+        socket.emit('send-chat-message', txt);
         input.value = '';
     }
 
@@ -275,18 +386,17 @@
         if (!isHost) return;
         chatEnabled = !chatEnabled;
         socket.emit('toggle-chat-status', chatEnabled);
-        updateChatUIState();
+        updateChatUI();
     }
 
-    function updateChatUIState() {
+    function updateChatUI() {
         const inputArea = document.getElementById('chat-input-area');
-        const banner = document.getElementById('chat-disabled-banner');
-        const toggleBtn = document.getElementById('btn-toggle-chat');
+        const banner = document.getElementById('chat-disabled-msg');
+        const btn = document.getElementById('btn-toggle-chat');
 
-        if (toggleBtn) {
-            toggleBtn.innerText = chatEnabled ? "🔒 Disable Chat" : "🔓 Enable Chat";
-            toggleBtn.style.background = chatEnabled ? "#ffc107" : "#28a745";
-            toggleBtn.style.color = chatEnabled ? "#000" : "#fff";
+        if (btn) {
+            btn.innerText = chatEnabled ? "🔒 Disable Chat" : "🔓 Enable Chat";
+            btn.style.background = chatEnabled ? "#ffc107" : "#28a745";
         }
 
         if (!chatEnabled && !isHost) {
@@ -298,251 +408,49 @@
         }
     }
 
-    function appendChatMessage(msg) {
-        const container = document.getElementById('chat-messages');
-        const msgDiv = document.createElement('div');
-        msgDiv.className = 'chat-msg';
-        msgDiv.innerHTML = `
-            <div class="meta">
-                <span><strong>${msg.sender}</strong> ${msg.isHost ? '(Teacher)' : ''}</span>
-                <span>${msg.time}</span>
-            </div>
-            <div>${msg.text}</div>
-        `;
-        container.appendChild(msgDiv);
-        container.scrollTop = container.scrollHeight;
-    }
+    socket.on('new-chat-message', (msg) => {
+        const box = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = 'msg';
+        div.innerHTML = `<div class="msg-sender">${msg.sender} ${msg.isHost ? '(Teacher)' : ''} • ${msg.time}</div><div>${msg.text}</div>`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    });
 
     socket.on('load-chat-history', (data) => {
         chatEnabled = data.enabled;
         document.getElementById('chat-messages').innerHTML = '';
-        data.history.forEach(appendChatMessage);
-        updateChatUIState();
-    });
-
-    socket.on('new-chat-message', (msgData) => {
-        appendChatMessage(msgData);
+        data.history.forEach(msg => {
+            const box = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'msg';
+            div.innerHTML = `<div class="msg-sender">${msg.sender} ${msg.isHost ? '(Teacher)' : ''} • ${msg.time}</div><div>${msg.text}</div>`;
+            box.appendChild(div);
+        });
+        updateChatUI();
     });
 
     socket.on('chat-status-changed', (enabled) => {
         chatEnabled = enabled;
-        updateChatUIState();
+        updateChatUI();
     });
 
-    /* Host Tools & Canvas Actions */
-    function setTool(tool) {
-        if (!isHost) return;
-        currentTool = tool;
-        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-        const activeBtn = document.getElementById(`tool-${tool}`);
-        if (activeBtn) activeBtn.classList.add('active');
-    }
-
-    canvas.addEventListener('click', (e) => {
-        if (!isHost || currentTool !== 'text') return;
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        const userText = prompt("Enter chemical formula or text:", "");
-        if (userText) {
-            drawText(userText, x, y, currentColor, currentSize * 4 + 12);
-            socket.emit('draw-data', { tool: 'text', text: userText, x, y, color: currentColor, fontSize: currentSize * 4 + 12 });
-        }
-    });
-
-    canvas.addEventListener('mousedown', (e) => {
-        if (!isHost || currentTool === 'text') return;
-        isDrawing = true;
-        const rect = canvas.getBoundingClientRect();
-        startX = e.clientX - rect.left;
-        startY = e.clientY - rect.top;
-        snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        if (currentTool === 'draw' || currentTool === 'erase') {
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-        }
-    });
-
-    canvas.addEventListener('mouseup', (e) => {
-        if (!isHost || !isDrawing || currentTool === 'text') return;
-        isDrawing = false;
-        const rect = canvas.getBoundingClientRect();
-        const endX = e.clientX - rect.left;
-        const endY = e.clientY - rect.top;
-
-        if (currentTool !== 'draw' && currentTool !== 'erase') {
-            drawShape(currentTool, startX, startY, endX, endY);
-            socket.emit('draw-data', { tool: currentTool, x1: startX, y1: startY, x2: endX, y2: endY, color: currentColor, size: currentSize });
-        }
-        ctx.beginPath();
-    });
-
-    canvas.addEventListener('mousemove', (e) => {
-        if (!isHost || !isDrawing || currentTool === 'text') return;
-        const rect = canvas.getBoundingClientRect();
-        const currentX = e.clientX - rect.left;
-        const currentY = e.clientY - rect.top;
-
-        if (currentTool === 'draw' || currentTool === 'erase') {
-            ctx.lineWidth = currentSize;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = currentTool === 'erase' ? '#ffffff' : currentColor;
-            ctx.lineTo(currentX, currentY);
-            ctx.stroke();
-            socket.emit('draw-data', { tool: currentTool, x: currentX, y: currentY, color: ctx.strokeStyle, size: currentSize });
-        } else {
-            ctx.putImageData(snapshot, 0, 0);
-            drawShape(currentTool, startX, startY, currentX, currentY);
-        }
-    });
-
-    function drawText(text, x, y, color, fontSize) {
-        ctx.font = `${fontSize}px 'Segoe UI', sans-serif`;
-        ctx.fillStyle = color;
-        ctx.fillText(text, x, y);
-    }
-
-    function drawShape(tool, x1, y1, x2, y2) {
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const radius = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx);
-
-        ctx.lineWidth = currentSize;
-        ctx.strokeStyle = currentColor;
-        ctx.fillStyle = currentColor;
-        ctx.beginPath();
-
-        switch (tool) {
-            case 'arrow':
-                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x2, y2);
-                ctx.lineTo(x2 - 12 * Math.cos(angle - Math.PI / 6), y2 - 12 * Math.sin(angle - Math.PI / 6));
-                ctx.lineTo(x2 - 12 * Math.cos(angle + Math.PI / 6), y2 - 12 * Math.sin(angle + Math.PI / 6));
-                ctx.closePath(); ctx.fill();
-                break;
-            case 'equilibrium':
-                const perpX = Math.sin(angle) * 6;
-                const perpY = -Math.cos(angle) * 6;
-                ctx.moveTo(x1 + perpX, y1 + perpY); ctx.lineTo(x2 + perpX, y2 + perpY); ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x2 + perpX, y2 + perpY);
-                ctx.lineTo(x2 + perpX - 10 * Math.cos(angle - Math.PI / 6), y2 + perpY - 10 * Math.sin(angle - Math.PI / 6)); ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x2 - perpX, y2 - perpY); ctx.lineTo(x1 - perpX, y1 - perpY); ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x1 - perpX, y1 - perpY);
-                ctx.lineTo(x1 - perpX + 10 * Math.cos(angle - Math.PI / 6), y1 - perpY + 10 * Math.sin(angle - Math.PI / 6)); ctx.stroke();
-                break;
-            case 'singlebond':
-                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-                break;
-            case 'doublebond':
-                const px2 = Math.sin(angle) * 3;
-                const py2 = -Math.cos(angle) * 3;
-                ctx.moveTo(x1 + px2, y1 + py2); ctx.lineTo(x2 + px2, y2 + py2);
-                ctx.moveTo(x1 - px2, y1 - py2); ctx.lineTo(x2 - px2, y2 - py2); ctx.stroke();
-                break;
-            case 'triplebond':
-                const px3 = Math.sin(angle) * 5;
-                const py3 = -Math.cos(angle) * 5;
-                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
-                ctx.moveTo(x1 + px3, y1 + py3); ctx.lineTo(x2 + px3, y2 + py3);
-                ctx.moveTo(x1 - px3, y1 - py3); ctx.lineTo(x2 - px3, y2 - py3); ctx.stroke();
-                break;
-            case 'benzene':
-                drawPolygon(x1, y1, radius, 6); ctx.stroke();
-                ctx.beginPath(); ctx.arc(x1, y1, radius * 0.55, 0, Math.PI * 2); ctx.stroke();
-                break;
-            case 'beaker':
-                ctx.rect(x1 - 30, y1 - 40, 60, 80);
-                ctx.moveTo(x1 - 35, y1 - 40); ctx.lineTo(x1 + 35, y1 - 40);
-                ctx.moveTo(x1 - 30, y1 + 20); ctx.lineTo(x1 + 30, y1 + 20); ctx.stroke();
-                break;
-            case 'flask':
-                ctx.moveTo(x1 - 10, y1 - 40); ctx.lineTo(x1 + 10, y1 - 40);
-                ctx.lineTo(x1 + 10, y1 - 10); ctx.lineTo(x1 + 30, y1 + 30);
-                ctx.lineTo(x1 - 30, y1 + 30); ctx.lineTo(x1 - 10, y1 - 10); ctx.closePath(); ctx.stroke();
-                break;
-            case 'pill':
-                ctx.arc(x1 - 15, y1, 15, Math.PI / 2, -Math.PI / 2);
-                ctx.arc(x1 + 15, y1, 15, -Math.PI / 2, Math.PI / 2); ctx.closePath();
-                ctx.moveTo(x1, y1 - 15); ctx.lineTo(x1, y1 + 15); ctx.stroke();
-                break;
-        }
-    }
-
-    function drawPolygon(x, y, radius, sides) {
-        const polyAngle = (Math.PI * 2) / sides;
-        for (let i = 0; i < sides; i++) {
-            const px = x + radius * Math.cos(i * polyAngle);
-            const py = y + radius * Math.sin(i * polyAngle);
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-    }
-
-    function clearWhiteboard() {
-        if (!isHost) return;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        socket.emit('clear-canvas');
-    }
-
-    function renderDrawItem(data) {
-        if (data.tool === 'text') {
-            drawText(data.text, data.x, data.y, data.color, data.fontSize);
-        } else if (data.tool === 'draw' || data.tool === 'erase') {
-            ctx.lineWidth = data.size;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = data.color;
-            ctx.lineTo(data.x, data.y);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(data.x, data.y);
-        } else {
-            drawShape(data.tool, data.x1, data.y1, data.x2, data.y2);
-        }
-    }
-
-    socket.on('load-canvas-history', (history) => {
-        history.forEach(item => renderDrawItem(item));
-    });
-
-    socket.on('draw-data', (data) => {
-        renderDrawItem(data);
-    });
-
-    socket.on('clear-canvas', () => {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    });
-
+    /* Participant Updates */
     socket.on('update-participants', (users) => {
-        document.getElementById('participant-count').innerText = users.length;
+        document.getElementById('disp-count').innerText = users.length;
         const list = document.getElementById('participant-list');
         list.innerHTML = '';
-        
-        users.forEach(user => {
+
+        users.forEach(u => {
             const li = document.createElement('li');
             li.innerHTML = `
-                <div class="user-header">
-                    <strong>${user.username}</strong>
-                    <span class="badge ${user.isHost ? 'badge-host' : 'badge-student'}">
-                        ${user.isHost ? 'Teacher' : 'Student'}
-                    </span>
+                <div class="user-meta">
+                    <strong>${u.username}</strong>
+                    <span class="role-tag ${u.isHost ? 'role-teacher' : 'role-student'}">${u.isHost ? 'Teacher' : 'Student'}</span>
                 </div>
                 <div class="user-status">
-                    <span class="${user.isMuted ? 'status-off' : 'status-on'}">
-                        ${user.isMuted ? '🔇 Muted' : '🎤 Unmuted'}
-                    </span>
-                    <span class="${user.isCameraOn ? 'status-on' : 'status-off'}">
-                        ${user.isCameraOn ? '📹 Camera On' : '📷 Camera Off'}
-                    </span>
+                    <span>${u.isMuted ? '🔇 Muted' : '🎤 Mic On'}</span>
+                    <span>${u.isCameraOn ? '📹 Cam On' : '📷 Cam Off'}</span>
                 </div>
             `;
             list.appendChild(li);
