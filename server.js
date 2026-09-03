@@ -1,130 +1,181 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
+
 const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST']
+    }
+});
 
-app.use(express.static('public'));
+// Serve static files reliably from the 'public' folder
+app.use(express.static(path.join(__dirname, 'public')));
 
+// Explicit fallback to index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Room State Storage
+const rooms = {};
 
 io.on('connection', (socket) => {
+    let currentRoom = null;
+    let userId = socket.id;
+
     socket.on('join-room', ({ roomId, username, isHost }) => {
+        currentRoom = roomId;
+        socket.join(roomId);
+
+        // Initialize room state if new
         if (!rooms[roomId]) {
             rooms[roomId] = {
-                participants: [],
-                hostId: null,
-                drawHistory: [],
+                hostId: isHost ? userId : null,
+                users: {},
                 chatHistory: [],
+                canvasHistory: [],
                 chatEnabled: true
             };
         }
 
         const room = rooms[roomId];
 
-        let assignedRoleIsHost = isHost;
-        if (isHost) {
-            if (room.hostId && room.hostId !== socket.id) {
-                assignedRoleIsHost = false;
-                socket.emit('host-denied', 'A host (teacher) is already active in this room. Joined as a Student instead.');
-            } else {
-                room.hostId = socket.id;
-            }
+        // Ensure only one host exists if requested
+        let effectiveHost = isHost;
+        if (isHost && room.hostId && room.hostId !== userId) {
+            effectiveHost = false; // Downgrade to student if host already exists
+        } else if (isHost && !room.hostId) {
+            room.hostId = userId;
         }
 
-        const user = {
-            id: socket.id,
-            username: username || (assignedRoleIsHost ? 'Teacher' : 'Student'),
-            isHost: assignedRoleIsHost,
+        // Store user state
+        room.users[userId] = {
+            id: userId,
+            username: username || 'Anonymous',
+            isHost: effectiveHost,
             isMuted: true,
             isCameraOn: false
         };
 
-        room.participants.push(user);
-        socket.roomId = roomId;
-        socket.isHost = assignedRoleIsHost;
-        socket.username = user.username;
+        // Notify user of role confirmation
+        socket.emit('role-confirmed', { isHost: effectiveHost });
 
-        socket.join(roomId);
-
-        socket.emit('role-confirmed', { isHost: assignedRoleIsHost });
-        io.to(roomId).emit('update-participants', room.participants);
-
-        // Send whiteboard & chat history to joining participant
-        socket.emit('load-canvas-history', room.drawHistory);
-        socket.emit('load-chat-history', { history: room.chatHistory, enabled: room.chatEnabled });
-
-        socket.on('update-media-status', (status) => {
-            const currentRoom = rooms[socket.roomId];
-            if (currentRoom) {
-                const targetUser = currentRoom.participants.find(u => u.id === socket.id);
-                if (targetUser) {
-                    targetUser.isMuted = status.isMuted;
-                    targetUser.isCameraOn = status.isCameraOn;
-                    io.to(socket.roomId).emit('update-participants', currentRoom.participants);
-                }
-            }
+        // Send existing room history to joining user
+        socket.emit('load-canvas-history', room.canvasHistory);
+        socket.emit('load-chat-history', {
+            history: room.chatHistory,
+            enabled: room.chatEnabled
         });
 
-        // Chat logic
-        socket.on('send-chat-message', (messageText) => {
-            const currentRoom = rooms[socket.roomId];
-            if (!currentRoom) return;
+        // Broadcast updated user list to everyone in room
+        io.to(roomId).emit('update-participants', Object.values(room.users));
+        
+        // Notify other users for WebRTC peer connections
+        socket.to(roomId).emit('user-connected', { userId, username });
+    });
 
-            // Block student messages if chat is disabled
-            if (!currentRoom.chatEnabled && !socket.isHost) return;
+    // Handle Media Status Updates (Mute/Camera toggles)
+    socket.on('update-media-status', (status) => {
+        if (!currentRoom || !rooms[currentRoom] || !rooms[currentRoom].users[userId]) return;
+        rooms[currentRoom].users[userId].isMuted = status.isMuted;
+        rooms[currentRoom].users[userId].isCameraOn = status.isCameraOn;
+        io.to(currentRoom).emit('update-participants', Object.values(rooms[currentRoom].users));
+    });
 
-            const msgData = {
-                sender: socket.username,
-                isHost: socket.isHost,
-                text: messageText,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            };
+    // Handle Drawing Events
+    socket.on('draw-stroke', (strokeData) => {
+        if (!currentRoom || !rooms[currentRoom]) return;
+        const room = rooms[currentRoom];
+        const user = room.users[userId];
 
-            currentRoom.chatHistory.push(msgData);
-            io.to(socket.roomId).emit('new-chat-message', msgData);
-        });
+        // Only host can draw
+        if (user && user.isHost) {
+            room.canvasHistory.push(strokeData);
+            socket.to(currentRoom).emit('draw-stroke', strokeData);
+        }
+    });
 
-        socket.on('toggle-chat-status', (enabled) => {
-            if (socket.isHost && rooms[roomId]) {
-                rooms[roomId].chatEnabled = enabled;
-                io.to(roomId).emit('chat-status-changed', enabled);
-            }
-        });
+    // Clear Whiteboard
+    socket.on('clear-canvas', () => {
+        if (!currentRoom || !rooms[currentRoom]) return;
+        const room = rooms[currentRoom];
+        const user = room.users[userId];
 
-        // Whiteboard logic
-        socket.on('draw-data', (data) => {
-            if (socket.isHost && rooms[roomId]) {
-                rooms[roomId].drawHistory.push(data);
-                socket.to(roomId).emit('draw-data', data);
-            }
-        });
+        if (user && user.isHost) {
+            room.canvasHistory = [];
+            io.to(currentRoom).emit('clear-canvas');
+        }
+    });
 
-        socket.on('clear-canvas', () => {
-            if (socket.isHost && rooms[roomId]) {
-                rooms[roomId].drawHistory = [];
-                socket.to(roomId).emit('clear-canvas');
-            }
-        });
+    // Handle Chat Messages
+    socket.on('send-chat-message', (text) => {
+        if (!currentRoom || !rooms[currentRoom]) return;
+        const room = rooms[currentRoom];
+        const user = room.users[userId];
 
-        socket.on('disconnect', () => {
-            if (rooms[roomId]) {
-                rooms[roomId].participants = rooms[roomId].participants.filter(u => u.id !== socket.id);
-                
-                if (room.hostId === socket.id) {
-                    room.hostId = null;
-                }
+        if (!user) return;
+        if (!room.chatEnabled && !user.isHost) return; // Block student messages if disabled
 
-                if (rooms[roomId].participants.length === 0) {
-                    delete rooms[roomId];
-                } else {
-                    io.to(roomId).emit('update-participants', rooms[roomId].participants);
-                }
-            }
-        });
+        const msgData = {
+            sender: user.username,
+            isHost: user.isHost,
+            text: text,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        room.chatHistory.push(msgData);
+        io.to(currentRoom).emit('new-chat-message', msgData);
+    });
+
+    // Handle Toggle Chat Permission
+    socket.on('toggle-chat-status', (enabled) => {
+        if (!currentRoom || !rooms[currentRoom]) return;
+        const room = rooms[currentRoom];
+        const user = room.users[userId];
+
+        if (user && user.isHost) {
+            room.chatEnabled = enabled;
+            io.to(currentRoom).emit('chat-status-changed', enabled);
+        }
+    });
+
+    // WebRTC Signaling Events
+    socket.on('webrtc-offer', ({ targetId, offer }) => {
+        io.to(targetId).emit('webrtc-offer', { senderId: userId, offer });
+    });
+
+    socket.on('webrtc-answer', ({ targetId, answer }) => {
+        io.to(targetId).emit('webrtc-answer', { senderId: userId, answer });
+    });
+
+    socket.on('webrtc-ice-candidate', ({ targetId, candidate }) => {
+        io.to(targetId).emit('webrtc-ice-candidate', { senderId: userId, candidate });
+    });
+
+    // Handle Disconnections
+    socket.on('disconnect', () => {
+        if (!currentRoom || !rooms[currentRoom]) return;
+        const room = rooms[currentRoom];
+
+        delete room.users[userId];
+        if (room.hostId === userId) {
+            room.hostId = null; // Reset host if host left
+        }
+
+        if (Object.keys(room.users).length === 0) {
+            delete rooms[currentRoom]; // Clean up empty room
+        } else {
+            io.to(currentRoom).emit('update-participants', Object.values(room.users));
+            io.to(currentRoom).emit('user-disconnected', userId);
+        }
     });
 });
 
 const PORT = process.env.PORT || 3000;
-
-http.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
